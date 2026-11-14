@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ŞantiyeKontrol — İnşaat Muhasebe & Excel Otomasyon Demosu</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar no-print">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">ŞK</div>
+        <div>
+          <div class="brand-title">ŞantiyeKontrol <span class="badge-demo">DEMO</span></div>
+          <div class="brand-sub">İnşaat Muhasebesi &amp; Excel Otomasyon Paketi</div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <span class="privacy-pill" title="Yüklenen Excel dosyaları hiçbir sunucuya gönderilmez, tamamen tarayıcınızda işlenir.">
+          <span class="dot-green"></span> %100 Yerel &amp; Çevrimdışı Çalışır
+        </span>
+        <button id="btnDownloadSampleFiles" class="btn btn-outline btn-sm" type="button">
+          Örnek Excel Dosyaları İndir
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs-bar no-print" aria-label="Modüller">
+    <div class="container tabs-inner">
+      <button class="tab-btn active" data-tab="tab-reconcile" type="button">
+        1. İrsaliye – Fatura Kontrolü
+      </button>
+      <button class="tab-btn" data-tab="tab-analytics" type="button">
+        2. Şantiye Maliyet &amp; Tedarikçi Özeti
+      </button>
+      <button class="tab-btn" data-tab="tab-hakedis" type="button">
+        3. Taşeron Hakediş Hesaplayıcı
+      </button>
+    </div>
+  </nav>
+
+  <!-- Yazdırma / PDF başlığı (sadece çıktı alınırken görünür) -->
+  <div class="print-header">
+    <div>
+      <strong>ŞantiyeKontrol — Yönetici Kontrol Raporu</strong>
+      <div id="printMeta" class="print-meta"></div>
+    </div>
+    <div class="print-meta">Yerel Muhasebe Otomasyonu Çıktısı</div>
+  </div>
+
+  <main class="container main-content">
+    <!-- TAB 1: İRSALİYE - FATURA KONTROLÜ -->
+    <section id="tab-reconcile" class="tab-panel active">
+      <div class="hero-strip no-print">
+        <div>
+          <h1>Şantiye İrsaliye &amp; Tedarikçi Fatura Çapraz Kontrolü</h1>
+          <p>
+            Şantiyelerden gelen irsaliye Excel'i ile tedarikçi fatura listesini saniyeler içinde karşılaştırın;
+            <strong>miktar farklarını, birim fiyat artışlarını, mükerrer kayıtları ve irsaliyesiz faturaları</strong> anında yakalayın.
+          </p>
+        </div>
+        <div class="hero-cta">
+          <button id="btnLoadDemo" class="btn btn-amber" type="button">
+            Hazır Örnek Veriyle Demo Başlat
+          </button>
+        </div>
+      </div>
+
+      <div class="upload-grid no-print">
+        <div class="dropzone" id="dropIrsaliye">
+          <input type="file" id="fileIrsaliye" accept=".xlsx,.csv,.tsv" hidden />
+          <div class="dropzone-badge">1. Dosya</div>
+          <div class="dropzone-title">Şantiye İrsaliye Listesi</div>
+          <div class="dropzone-desc"><code>.xlsx</code> veya <code>.csv</code> dosyasını sürükleyin ya da seçin</div>
+          <div class="dropzone-status" id="statusIrsaliye">Henüz dosya seçilmedi</div>
+          <button class="btn btn-outline btn-sm" id="btnPickIrsaliye" type="button">Dosya Seç</button>
+        </div>
+
+        <div class="dropzone" id="dropFatura">
+          <input type="file" id="fileFatura" accept=".xlsx,.csv,.tsv" hidden />
+          <div class="dropzone-badge">2. Dosya</div>
+          <div class="dropzone-title">Tedarikçi Fatura Listesi</div>
+          <div class="dropzone-desc"><code>.xlsx</code> veya <code>.csv</code> dosyasını sürükleyin ya da seçin</div>
+          <div class="dropzone-status" id="statusFatura">Henüz dosya seçilmedi</div>
+          <button class="btn btn-outline btn-sm" id="btnPickFatura" type="button">Dosya Seç</button>
+        </div>
+      </div>
+
+      <!-- Esnek Sütun Eşleştirme Paneli -->
+      <details class="card mapping-card no-print" id="mappingSection">
+        <summary class="mapping-summary">
+          <span>Sütun Eşleştirme Ayarları (Farklı Excel formatları için otomatik tahmin)</span>
+          <span class="mapping-hint">Değiştirmek için tıklayın</span>
+        </summary>
+        <div class="mapping-body">
+          <div class="mapping-cols">
+            <div>
+              <h3>İrsaliye Dosyası Sütunları</h3>
+              <div id="mapIrsaliyeGrid" class="mapping-grid"></div>
+            </div>
+            <div>
+              <h3>Fatura Dosyası Sütunları</h3>
+              <div id="mapFaturaGrid" class="mapping-grid"></div>
+            </div>
+          </div>
+          <div class="mapping-actions">
+            <button id="btnRunReconcile" class="btn btn-primary" type="button">
+              Eşleştirmeyi Yeniden Çalıştır
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <!-- Sonuç Bölümü -->
+      <div id="reconcileResults" class="results-wrap hidden">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">Kontrol Edilen Kalem</div>
+            <div class="kpi-value" id="kpiTotalRows">0</div>
+            <div class="kpi-sub" id="kpiMatchedSub">0 tam eşleşme</div>
+          </div>
+          <div class="kpi-card kpi-danger">
+            <div class="kpi-label">Yakalanan Hata / Fark</div>
+            <div class="kpi-value" id="kpiErrorRows">0</div>
+            <div class="kpi-sub" id="kpiErrorSub">İnceleme gerektiren satır</div>
+          </div>
+          <div class="kpi-card kpi-amber">
+            <div class="kpi-label">Fazla Faturalandırma Riski</div>
+            <div class="kpi-value" id="kpiRiskAmount">0,00 ₺</div>
+            <div class="kpi-sub">İrsaliye fazlası / desteksiz tutar</div>
+          </div>
+          <div class="kpi-card kpi-info">
+            <div class="kpi-label">Fatura Bekleyen İrsaliye</div>
+            <div class="kpi-value" id="kpiPendingRows">0</div>
+            <div class="kpi-sub" id="kpiPendingSub">0,00 ₺ tutarında teslimat</div>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="toolbar no-print">
+            <div class="filter-pills" id="filterPills">
+              <button class="pill active" data-filter="ALL" type="button">Tümü</button>
+              <button class="pill" data-filter="ERRORS" type="button">Sadece Sorunlular</button>
+              <button class="pill" data-filter="MİKTAR" type="button">Miktar Farkı</button>
+              <button class="pill" data-filter="FİYAT" type="button">Fiyat Farkı</button>
+              <button class="pill" data-filter="İRSALİYE YOK" type="button">İrsaliye Yok</button>
+              <button class="pill" data-filter="MÜKERRER FATURA" type="button">Mükerrer</button>
+              <button class="pill" data-filter="FATURA BEKLİYOR" type="button">Fatura Bekliyor</button>
+              <button class="pill" data-filter="EŞLEŞTİ" type="button">Eşleşti</button>
+            </div>
+
+            <div class="toolbar-right">
+              <select id="siteFilter" class="input-control" aria-label="Şantiye Filtresi">
+                <option value="ALL">Tüm Şantiyeler</option>
+              </select>
+              <input id="searchInput" class="input-control" type="search" placeholder="İrsaliye, tedarikçi, malzeme ara..." />
+              <button id="btnExportReconcileXlsx" class="btn btn-success btn-sm" type="button">
+                Excel Raporu İndir (.xlsx)
+              </button>
+              <button id="btnPrintReconcile" class="btn btn-outline btn-sm" type="button">
+                PDF / Yazdır
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Durum</th>
+                  <th>İrsaliye / Fatura No</th>
+                  <th>Şantiye &amp; Tedarikçi</th>
+                  <th>Malzeme</th>
+                  <th class="num">İrsaliye Tutarı</th>
+                  <th class="num">Fatura Tutarı</th>
+                  <th class="num">Fark (TL)</th>
+                  <th>Tespit &amp; Açıklama</th>
+                </tr>
+              </thead>
+              <tbody id="reconcileTableBody"></tbody>
+            </table>
+          </div>
+          <div id="emptyTableState" class="empty-state hidden">
+            Seçilen filtrelere uygun kayıt bulunamadı.
+          </div>
+        </div>
+      </div>
+
+      <div id="reconcilePlaceholder" class="card placeholder-card no-print">
+        <div class="placeholder-title">Başlamak için yukarıdan iki Excel dosyası seçin veya örnek veriyi yükleyin</div>
+        <p>
+          Demo verisi yüklendiğinde program otomatik olarak <strong>fazla kesilmiş beton irsaliyesini, sözleşme üstü demir birim fiyatını, hayalet nakliye faturasını ve çift girilmiş mükerrer faturayı</strong> saniyeler içinde yakalar.
+        </p>
+      </div>
+    </section>
+
+    <!-- TAB 2: ŞANTİYE MALİYET & TEDARİKÇİ ÖZETİ -->
+    <section id="tab-analytics" class="tab-panel">
+      <div class="hero-strip no-print">
+        <div>
+          <h1>Şantiye Bazlı Maliyet &amp; Tedarikçi Güvenilirlik Özeti</h1>
+          <p>
+            Yüklenen irsaliye ve fatura verilerinden patrona veya proje müdürüne sunulacak özet raporlar otomatik oluşturulur.
+          </p>
+        </div>
+        <div class="hero-cta">
+          <button id="btnAnalyticsDemo" class="btn btn-amber hidden" type="button">
+            Örnek Veriyle Önizle
+          </button>
+          <button id="btnPrintAnalytics" class="btn btn-outline" type="button">
+            Yönetici Özeti PDF / Yazdır
+          </button>
+        </div>
+      </div>
+
+      <div id="analyticsPlaceholder" class="card placeholder-card no-print">
+        <div class="placeholder-title">Henüz analiz edilecek veri yüklenmedi</div>
+        <p>1. sekmeden kendi Excel dosyalarınızı yükleyebilir veya tek tıkla örnek inşaat verisini çalıştırabilirsiniz.</p>
+        <button id="btnLoadDemoFromAnalytics" class="btn btn-amber" type="button">Hazır Örnek Veriyi Yükle</button>
+      </div>
+
+      <div id="analyticsContent" class="hidden">
+        <div class="analytics-grid">
+          <div class="card">
+            <h2 class="card-title">Şantiye Bazlı Toplam Maliyet</h2>
+            <p class="card-subtitle">Şantiyelere göre malzeme/hizmet girişi ve tespit edilen fatura riski</p>
+            <div id="siteBarsContainer" class="bar-list"></div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Malzeme &amp; Gider Grubu Dağılımı</h2>
+            <p class="card-subtitle">Kalem isimlerinden otomatik sınıflandırılmış maliyet kalemleri</p>
+            <div id="categoryBarsContainer" class="bar-list"></div>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="card-header-row">
+            <div>
+              <h2 class="card-title">Tedarikçi Bazlı Fatura &amp; Hata Performansı</h2>
+              <p class="card-subtitle">Hangi tedarikçi daha sık fazla/hatalı fatura gönderiyor?</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tedarikçi Firma</th>
+                  <th class="num">Kalem Sayısı</th>
+                  <th class="num">İrsaliye Karşılığı</th>
+                  <th class="num">Kesilen Fatura</th>
+                  <th class="num">Hatalı Satır</th>
+                  <th class="num">Fazla Fatura Riski</th>
+                </tr>
+              </thead>
+              <tbody id="supplierTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: TAŞERON HAKEDİŞ HESAPLAYICI -->
+    <section id="tab-hakedis" class="tab-panel">
+      <div class="hero-strip no-print">
+        <div>
+          <h1>Taşeron Hakediş &amp; Kesinti Hesaplayıcı</h1>
+          <p>
+            İnşaat taşeronlarına yapılan hakediş ödemelerinde <strong>KDV tevkifatı, teminat kesintisi, avans mahsubu ve stopaj</strong> hesabını formül bozulma riski olmadan yapın; tek tıkla Excel ve PDF çıkarın.
+          </p>
+        </div>
+        <div class="hero-cta">
+          <button id="btnResetHakedis" class="btn btn-outline btn-sm" type="button">Örnek Değerlere Sıfırla</button>
+        </div>
+      </div>
+
+      <div class="hakedis-layout">
+        <div class="card">
+          <h2 class="card-title">Hakediş Bilgileri &amp; İş Kalemleri</h2>
+          <div class="form-grid">
+            <label class="field">
+              <span>Taşeron Firma</span>
+              <input id="hkFirma" class="input-control" type="text" value="Yıldız Kalıp & Demir İnşaat Ltd." />
+            </label>
+            <label class="field">
+              <span>Şantiye / Proje</span>
+              <input id="hkSantiye" class="input-control" type="text" value="Güneşli Konutları - B Blok" />
+            </label>
+            <label class="field">
+              <span>Hakediş No / Dönem</span>
+              <input id="hkDonem" class="input-control" type="text" value="Hakediş #04 — Kasım 2026" />
+            </label>
+          </div>
+
+          <div class="section-divider">
+            <span>Yapılan İş Kalemleri (KDV Hariç)</span>
+            <button id="btnAddHakedisRow" class="btn btn-outline btn-sm no-print" type="button">+ Kalem Ekle</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table compact-table">
+              <thead>
+                <tr>
+                  <th>İş Kalemi Açıklaması</th>
+                  <th class="num">Miktar</th>
+                  <th>Birim</th>
+                  <th class="num">Birim Fiyat (₺)</th>
+                  <th class="num">Tutar (₺)</th>
+                  <th class="no-print"></th>
+                </tr>
+              </thead>
+              <tbody id="hkItemsBody"></tbody>
+            </table>
+          </div>
+
+          <div class="section-divider">
+            <span>Vergi ve Kesinti Oranları</span>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>KDV Oranı (%)</span>
+              <select id="hkKdvRate" class="input-control">
+                <option value="20" selected>%20 (Standart)</option>
+                <option value="10">%10</option>
+                <option value="1">%1</option>
+                <option value="0">%0 (KDV'siz)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>KDV Tevkifatı</span>
+              <select id="hkTevkifat" class="input-control">
+                <option value="0.4" selected>4/10 (Yapım İşleri Tevkifatı)</option>
+                <option value="0.9">9/10 (İşgücü Temin Hizmeti)</option>
+                <option value="0.5">5/10</option>
+                <option value="0">Tevkifat Yok (0)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Teminat Kesintisi (%)</span>
+              <input id="hkTeminatRate" class="input-control" type="number" min="0" max="50" step="0.5" value="5" />
+            </label>
+            <label class="field">
+              <span>Stopaj Kesintisi (%)</span>
+              <input id="hkStopajRate" class="input-control" type="number" min="0" max="30" step="0.5" value="0" />
+            </label>
+            <label class="field">
+              <span>Avans Mahsubu (₺)</span>
+              <input id="hkAvans" class="input-control" type="number" min="0" step="100" value="35000" />
+            </label>
+            <label class="field">
+              <span>Diğer Kesinti / Malzeme (₺)</span>
+              <input id="hkDigerKesinti" class="input-control" type="number" min="0" step="100" value="4500" />
+            </label>
+          </div>
+        </div>
+
+        <div class="card hakedis-summary-card">
+          <h2 class="card-title">Hakediş İcmal Özeti</h2>
+          <p class="card-subtitle" id="hkSummaryHeader">Yıldız Kalıp &amp; Demir İnşaat Ltd. — Hakediş #04</p>
+
+          <dl class="summary-list">
+            <div class="summary-row">
+              <dt>Yapılan İş Tutarı (KDV Hariç)</dt>
+              <dd id="sumBrut">0,00 ₺</dd>
+            </div>
+            <div class="summary-row">
+              <dt>Hesaplanan Toplam KDV</dt>
+              <dd id="sumToplamKdv">0,00 ₺</dd>
+            </div>
+            <div class="summary-row muted">
+              <dt>Tevkif Edilen KDV (KDV2 ile Vergi Dairesine)</dt>
+              <dd id="sumTevkifatKdv">0,00 ₺</dd>
+            </div>
+            <div class="summary-row">
+              <dt>Taşerona Kalan KDV</dt>
+              <dd id="sumTaseronKdv">0,00 ₺</dd>
+            </div>
+            <div class="summary-row bold-row">
+              <dt>Fatura Ödenecek Toplam</dt>
+              <dd id="sumFaturaToplam">0,00 ₺</dd>
+            </div>
+
+            <div class="summary-sep">Kesintiler</div>
+
+            <div class="summary-row neg">
+              <dt>Teminat Kesintisi (<span id="lblTeminatPct">5</span>%)</dt>
+              <dd id="sumTeminat">-0,00 ₺</dd>
+            </div>
+            <div class="summary-row neg">
+              <dt>Stopaj Kesintisi (<span id="lblStopajPct">0</span>%)</dt>
+              <dd id="sumStopaj">-0,00 ₺</dd>
+            </div>
+            <div class="summary-row neg">
+              <dt>Avans Mahsubu</dt>
+              <dd id="sumAvans">-0,00 ₺</dd>
+            </div>
+            <div class="summary-row neg">
+              <dt>Diğer Kesinti / Ceza</dt>
+              <dd id="sumDiger">-0,00 ₺</dd>
+            </div>
+            <div class="summary-row bold-row neg">
+              <dt>Toplam Kesinti</dt>
+              <dd id="sumToplamKesinti">-0,00 ₺</dd>
+            </div>
+          </dl>
+
+          <div class="net-pay-box">
+            <div class="net-pay-label">TAŞERONA ÖDENECEK NET TUTAR</div>
+            <div class="net-pay-value" id="sumNetOdenecek">0,00 ₺</div>
+          </div>
+
+          <div class="hakedis-actions no-print">
+            <button id="btnExportHakedisXlsx" class="btn btn-success" type="button">
+              Hakediş Excel İndir (.xlsx)
+            </button>
+            <button id="btnPrintHakedis" class="btn btn-outline" type="button">
+              İmzaya Hazır PDF / Yazdır
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="xlsx-lite.js"></script>
+  <script src="reconcile.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
